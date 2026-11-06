@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gestor">
+<meta name="theme-color" content="#1a1226">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png">
+<title>Gestor de Cobranças</title>
+<style>
+:root{--bg:#f6f4fa;--card:#fff;--tx:#1d1630;--mut:#6f6785;--pri:#7c3aed;--bd:#e5e0f0;--ok:#16a34a;--wa:#25d366;--warn:#e3a64b;--bad:#ef4444;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#120d1c;--card:#1d1630;--tx:#f0ecfa;--mut:#a69cc0;--bd:#2f2547}}
+:root[data-theme="dark"]{--bg:#120d1c;--card:#1d1630;--tx:#f0ecfa;--mut:#a69cc0;--bd:#2f2547}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:76px}
+h1{font-size:20px;margin:0}header{padding:14px 16px 6px;display:flex;justify-content:space-between;align-items:center}
+main{padding:8px 14px;max-width:640px;margin:auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin:10px 0}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.mut{color:var(--mut);font-size:13px}.b{font-weight:600}
+.tag{font-size:12px;padding:2px 8px;border-radius:99px;color:#fff;white-space:nowrap}
+button,.btn{font:inherit;border:0;border-radius:10px;padding:9px 12px;background:var(--pri);color:#fff;cursor:pointer}
+button.s{background:var(--bd);color:var(--tx)}button.w{background:var(--wa);color:#04210f}button.g{background:var(--ok)}button.d{background:var(--bad)}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.acts button{flex:1;min-width:84px;padding:8px 6px;font-size:14px}
+input,select,textarea{width:100%;font:inherit;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);margin:3px 0 10px}
+label{font-size:13px;color:var(--mut)}textarea{min-height:130px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;background:none;color:var(--mut);border-radius:0;padding:10px 2px;font-size:11px}nav button.on{color:var(--pri);font-weight:700}
+nav span{display:block;font-size:19px}
+.fab{position:fixed;right:16px;bottom:calc(76px + env(safe-area-inset-bottom,0px));width:54px;height:54px;border-radius:50%;font-size:28px;padding:0;box-shadow:0 4px 14px #0004}
+.kpi{display:grid;grid-template-columns:1fr 1fr;gap:10px}.kpi .card{margin:0;text-align:center}.kpi b{font-size:22px;display:block}
+.ov{position:fixed;inset:0;background:#000a;display:flex;align-items:flex-end;z-index:9}
+.sh{background:var(--bg);width:100%;max-height:92%;overflow:auto;border-radius:18px 18px 0 0;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));max-width:640px;margin:auto}
+</style>
+</head>
+<body>
+<header><h1>💜 Gestor de Cobranças</h1><span class="mut" id="ver">v1.1 mobile</span></header>
+<main id="app"></main>
+<nav id="nav"></nav>
+<script>
+const KEY='gestor_v1';
+const MODELOS={
+'Prévia (3 dias)':'📅 AVISO DE VENCIMENTO PRÓXIMO\nOlá!😊 [Nome], passamos aqui pra lembrar que sua assinatura vence em 3 dias.\n\n🔄 Para continuar sem interrupções, já pode adiantar sua renovação.\n\n*copiar e colar*\n\n💠PIX: `{pix}`\n\n📸 Após o pagamento, envie o comprovante.✅\n-Obrigado pela preferência!🙏',
+'Vence hoje':'⚠️AVISO DE VENCIMENTO⚠️\nOlá!😊[Nome], seu plano está vencendo.\n\n🔄 Para continuar sem interrupções, faça sua renovação.\n\n*copiar e colar*\n\n💠PIX: `{pix}`\n\n📸 Após o pagamento, envie o comprovante.✅\n-Obrigado pela preferência!🙏',
+'Em atraso':'🚨 PAGAMENTO EM ATRASO 🚨\nOlá!😔 [Nome], identificamos que sua mensalidade está pendente.\n\n🔄 Pra evitar a suspensão do serviço, regularize o quanto antes.\n\n*copiar e colar*\n\n💠PIX: `{pix}`\n\n📸 Após o pagamento, envie o comprovante.✅\n-Obrigado pela preferência!🙏',
+'Lembrete':'Olá [Nome], ainda não identificamos a confirmação do seu pagamento. Se já pagou, é só enviar o comprovante 📎'};
+let S=load(),tab='hoje',filtro='';
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&d.clientes)return d}catch(e){}return{clientes:[],hist:[],cfg:{pix:'',diasAtraso:3,tema:'auto'},nid:1}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));sync()}catch(e){alert('Não consegui salvar neste navegador.')}}
+const $=s=>document.querySelector(s);
+const hoje=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const dias=(a,b)=>Math.round((new Date(a+'T12:00')-new Date(b+'T12:00'))/864e5);
+const fmtD=d=>d?d.split('-').reverse().join('/'):'';
+const R=v=>'R$ '+(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function proxima(d,r){const x=new Date(d+'T12:00');if(r==='Diariamente')x.setDate(x.getDate()+1);else if(r==='Semanalmente')x.setDate(x.getDate()+7);else if(r==='Mensalmente')x.setMonth(x.getMonth()+1);else if(r==='Anualmente')x.setFullYear(x.getFullYear()+1);else return d;return x.toISOString().slice(0,10)}
+function estado(c){const a=dias(hoje(),c.venc);if(a>=S.cfg.diasAtraso)return'Atrasado';if(c.cobrado&&a>=0)return'Aguardando';if(a===0)return'Vence hoje';if(a<0&&a>=-3)return'Vence em breve';return'Em dia'}
+const COR={'Atrasado':'var(--bad)','Aguardando':'var(--warn)','Vence hoje':'var(--warn)','Vence em breve':'var(--pri)','Em dia':'var(--ok)'};
+function saud(){const h=new Date().getHours();return(['Olá','Oi','E aí'][Math.floor(Math.random()*3)])+', '+(h<12?'bom dia':h<18?'boa tarde':'boa noite')}
+function msg(c,modelo){let t=(modelo||c.msg||MODELOS['Vence hoje']);return t.replace(/\[Saudacao\]/gi,saud()).replace(/\[Nome\]/gi,c.nome).replace(/\{pix\}/g,c.pix||S.cfg.pix||'').replace(/\[Valor\]/gi,R(c.valor))}
+function tel(t){let n=String(t).replace(/\D/g,'');if(n.length<=11)n='55'+n;return n}
+function cobrar(id,modelo){const c=S.clientes.find(x=>x.id===id);const t=msg(c,modelo);
+ c.cobrado=hoje();c.cobradoN=(c.cobradoN||0)+1;save();
+ window.open('https://wa.me/'+tel(c.telefone)+'?text='+encodeURIComponent(t),'_blank');render()}
+function pagar(id){const c=S.clientes.find(x=>x.id===id);if(!confirm('Confirmar pagamento de '+c.nome+' ('+R(c.valor)+')?'))return;
+ S.hist.push({cid:id,nome:c.nome,valor:+c.valor||0,em:hoje(),venc:c.venc,dias:Math.max(0,dias(hoje(),c.venc))});
+ let n=proxima(c.venc,c.rep);while(c.rep!=='Não repetir'&&dias(n,hoje())<-0)n=proxima(n,c.rep);
+ if(c.rep==='Não repetir'){c.venc=c.venc}else c.venc=n;c.cobrado=null;c.cobradoN=0;save();render()}
+function nav(){const t=[['hoje','🔔','Cobrar'],['clientes','👥','Clientes'],['hist','🧾','Histórico'],['rel','📊','Relatório'],['cfg','⚙️','Ajustes']];
+ $('#nav').innerHTML=t.map(([k,i,n])=>`<button class="${tab===k?'on':''}" onclick="tab='${k}';filtro='';render()"><span>${i}</span>${n}</button>`).join('')}
+function card(c,full){const e=estado(c),a=dias(hoje(),c.venc);
+ return`<div class="card"><div class="row"><div><div class="b">${esc(c.nome)}</div><div class="mut">${esc(c.site||'')} ${c.site?'·':''} ${R(c.valor)}</div></div><span class="tag" style="background:${COR[e]}">${e}</span></div>
+ <div class="mut" style="margin-top:6px">Vence ${fmtD(c.venc)} ${a>0?'· '+a+' dia(s) de atraso':a===0?'· hoje':'· em '+(-a)+' dia(s)'} ${c.cobradoN?'· cobrado '+c.cobradoN+'x':''}</div>
+ <div class="acts"><button class="w" onclick="cobrar(${c.id})">💬 Cobrar</button><button class="g" onclick="pagar(${c.id})">✅ Pago</button>${full?`<button class="s" onclick="form(${c.id})">✏️ Editar</button><button class="s" onclick="ics([S.clientes.find(x=>x.id===${c.id})])">⏰ Alarme</button>`:''}</div></div>`}
+function render(){nav();const ap=$('#app');document.documentElement.dataset.theme=S.cfg.tema==='auto'?'':S.cfg.tema;let h='';
+ const L=S.clientes.slice().sort((a,b)=>a.venc.localeCompare(b.venc));
+ if(tab==='hoje'){const at=L.filter(c=>estado(c)==='Atrasado'),hj=L.filter(c=>['Vence hoje','Aguardando'].includes(estado(c))),br=L.filter(c=>estado(c)==='Vence em breve');
+  h+=`<div class="kpi"><div class="card"><b>${at.length}</b><span class="mut">Atrasados</span></div><div class="card"><b>${hj.length}</b><span class="mut">Hoje / aguardando</span></div></div>`;
+  if(!S.clientes.length)h+='<div class="card mut">Nenhum cliente ainda. Toque no + na aba Clientes.</div>';
+  [['🚨 Atrasados',at],['⚡ Vencem hoje / aguardando',hj],['🔔 Próximos 3 dias',br]].forEach(([t,a])=>{if(a.length)h+=`<h3>${t}</h3>`+a.map(c=>card(c)).join('')});
+  if(at.length+hj.length+br.length===0&&S.clientes.length)h+='<div class="card mut">Tudo em dia ✅</div>'}
+ if(tab==='clientes'){h+=`<input placeholder="Buscar cliente…" value="${esc(filtro)}" oninput="filtro=this.value;render();this.focus()" id="bq">`;
+  const f=L.filter(c=>c.nome.toLowerCase().includes(filtro.toLowerCase()));h+=f.map(c=>card(c,1)).join('')||'<div class="card mut">Nada por aqui.</div>';
+  h+='<button class="fab" onclick="form()">+</button>'}
+ if(tab==='hist'){h+=S.hist.slice().reverse().map(p=>`<div class="card row"><div><div class="b">${esc(p.nome)}</div><div class="mut">Pago em ${fmtD(p.em)} · venc. ${fmtD(p.venc)} · ${p.dias}d até pagar</div></div><b>${R(p.valor)}</b></div>`).join('')||'<div class="card mut">Nenhum pagamento registrado.</div>'}
+ if(tab==='rel'){const m=hoje().slice(0,7),mes=S.hist.filter(p=>p.em.startsWith(m)),tot=mes.reduce((s,p)=>s+p.valor,0),all=S.hist.reduce((s,p)=>s+p.valor,0),
+  aberto=S.clientes.filter(c=>dias(hoje(),c.venc)>=0).reduce((s,c)=>s+(+c.valor||0),0),prev=S.clientes.reduce((s,c)=>s+(+c.valor||0),0),
+  md=S.hist.length?(S.hist.reduce((s,p)=>s+p.dias,0)/S.hist.length).toFixed(1):'0';
+  h+=`<div class="kpi"><div class="card"><b>${R(tot)}</b><span class="mut">Recebido no mês</span></div><div class="card"><b>${R(aberto)}</b><span class="mut">Em aberto agora</span></div><div class="card"><b>${R(all)}</b><span class="mut">Total recebido</span></div><div class="card"><b>${R(prev)}</b><span class="mut">Previsto/ciclo</span></div><div class="card"><b>${S.clientes.length}</b><span class="mut">Clientes</span></div><div class="card"><b>${md}d</b><span class="mut">Média p/ pagar</span></div></div>`}
+ if(tab==='cfg'){h+=`<div class="card"><label>Chave Pix padrão</label><input id="cp" value="${esc(S.cfg.pix)}"><label>Dias sem pagar até virar Atrasado</label><input id="cd" type="number" min="1" value="${S.cfg.diasAtraso}"><label>Hora do aviso diário</label><input id="ch" type="time" value="${S.cfg.hora}"><label>Tema</label><select id="ct"><option value="auto">Automático</option><option value="light">Claro</option><option value="dark">Escuro</option></select><button onclick="cfgSave()">Salvar</button></div>
+  <div class="card"><div class="b">🔔 Avisos de vencimento</div><div class="mut" style="margin:4px 0 10px">Estado: ${('Notification' in window)?(Notification.permission==='granted'?'ligado ✅':'desligado'):'não suportado'}. Avisa clientes que vencem hoje e atrasados.</div><div class="acts"><button onclick="ativarAvisos()">Ativar avisos</button><button class="s" onclick="avisar(true)">Testar agora</button></div><div class="mut" style="margin:10px 0 6px">Garantia extra: alarme no calendário do celular (toca mesmo com o app fechado, nos dois sistemas).</div><div class="acts"><button class="s" onclick="ics(S.clientes)">⏰ Alarmes de todos os clientes</button></div></div>
+  <div class="card"><div class="b">Backup</div><div class="mut" style="margin:4px 0 10px">Seus dados ficam só neste aparelho. Exporte de vez em quando.</div><div class="acts"><button onclick="exp()">⬇️ Exportar</button><label class="btn s" style="margin:0;flex:1;text-align:center;color:var(--tx)">⬆️ Importar<input type="file" accept=".json" hidden onchange="imp(this.files[0])"></label></div></div>`}
+ ap.innerHTML=h;const t=$('#ct');if(t)t.value=S.cfg.tema;const q=$('#bq');if(q&&filtro){q.setSelectionRange(filtro.length,filtro.length)}}
+function cfgSave(){S.cfg.pix=$('#cp').value.trim();S.cfg.diasAtraso=Math.max(1,+$('#cd').value||3);S.cfg.tema=$('#ct').value;S.cfg.hora=$('#ch').value||'09:00';save();render();alert('Salvo ✅')}
+function exp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'}));a.download='gestor-backup-'+hoje()+'.json';a.click()}
+function imp(f){if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.clientes)throw 0;if(!confirm('Isso substitui os dados atuais. Continuar?'))return;S=d;save();render()}catch(e){alert('Arquivo inválido.')}};r.readAsText(f)}
+function form(id){const c=id?S.clientes.find(x=>x.id===id):{nome:'',telefone:'',valor:'',site:'',venc:hoje(),rep:'Mensalmente',pix:'',msg:MODELOS['Vence hoje']};
+ const o=document.createElement('div');o.className='ov';o.id='ov';
+ o.innerHTML=`<div class="sh"><h3 style="margin-top:0">${id?'Editar':'Novo'} cliente</h3>
+ <label>Nome</label><input id="f_n" value="${esc(c.nome)}"><label>WhatsApp (com DDD)</label><input id="f_t" type="tel" value="${esc(c.telefone)}">
+ <label>Valor (R$)</label><input id="f_v" type="number" step="0.01" value="${c.valor}"><label>Site / plano (Ibo, IboPro, One, SHM…)</label><input id="f_s" value="${esc(c.site)}">
+ <label>Próximo vencimento</label><input id="f_d" type="date" value="${c.venc}"><label>Repetição</label><select id="f_r">${['Mensalmente','Semanalmente','Diariamente','Anualmente','Não repetir'].map(x=>`<option ${x===c.rep?'selected':''}>${x}</option>`).join('')}</select>
+ <label>Pix deste cliente (vazio = padrão)</label><input id="f_p" value="${esc(c.pix)}">
+ <label>Modelo rápido</label><select onchange="if(this.value)document.getElementById('f_m').value=MODELOS[this.value]"><option value="">Escolher…</option>${Object.keys(MODELOS).map(k=>`<option>${k}</option>`).join('')}</select>
+ <label>Mensagem ([Nome], [Saudacao], [Valor], {pix})</label><textarea id="f_m">${esc(c.msg)}</textarea>
+ <div class="acts"><button class="s" onclick="$('#ov').remove()">Cancelar</button>${id?`<button class="d" onclick="del(${id})">Excluir</button>`:''}<button onclick="gravar(${id||0})">Salvar</button></div></div>`;
+ document.body.appendChild(o)}
+function gravar(id){const n=$('#f_n').value.trim(),t=$('#f_t').value.trim();if(!n||!t){alert('Preencha nome e WhatsApp.');return}
+ const d={nome:n,telefone:t,valor:+$('#f_v').value||0,site:$('#f_s').value.trim(),venc:$('#f_d').value||hoje(),rep:$('#f_r').value,pix:$('#f_p').value.trim(),msg:$('#f_m').value};
+ if(id)Object.assign(S.clientes.find(x=>x.id===id),d);else S.clientes.push({id:S.nid++,cobrado:null,cobradoN:0,...d});
+ save();$('#ov').remove();render()}
+function del(id){if(confirm('Excluir este cliente?')){S.clientes=S.clientes.filter(x=>x.id!==id);save();$('#ov').remove();render()}}
+S.cfg.hora=S.cfg.hora||'09:00';
+async function avisar(forcar){if(!('Notification' in window)||Notification.permission!=='granted')return;
+ const hj=S.clientes.filter(c=>dias(hoje(),c.venc)===0),at=S.clientes.filter(c=>estado(c)==='Atrasado');
+ if(!hj.length&&!at.length){if(forcar)alert('Nada vencendo hoje ✅');return}
+ if(!forcar&&(new Date().toTimeString().slice(0,5)<S.cfg.hora||S.cfg.avisado===hoje()))return;
+ S.cfg.avisado=hoje();save();
+ const t='💜 Cobranças de hoje',b=(hj.length?hj.length+' vence(m) hoje: '+hj.slice(0,4).map(c=>c.nome).join(', ')+'. ':'')+(at.length?at.length+' atrasado(s).':'');
+ try{const r=await navigator.serviceWorker.ready;r.showNotification(t,{body:b,icon:'icon-192.png',tag:'hoje'})}catch(e){new Notification(t,{body:b})}}
+async function ativarAvisos(){if(!('Notification' in window)){alert('Sem suporte a avisos aqui. No iPhone, instale na Tela de Início primeiro (iOS 16.4+).');return}
+ if(await Notification.requestPermission()!=='granted'){alert('Permissão negada.');return}
+ try{const r=await navigator.serviceWorker.ready;if(r.periodicSync)await r.periodicSync.register('avisos',{minInterval:36e5})}catch(e){}
+ sync();avisar(true);render()}
+function sync(){try{caches.open('dados').then(c=>c.put('dados.json',new Response(JSON.stringify({c:S.clientes.map(x=>({n:x.nome,v:x.venc})),h:S.cfg.hora,d:S.cfg.diasAtraso,a:S.cfg.avisado||''}))))}catch(e){}}
+function ics(list){if(!list.length){alert('Cadastre clientes primeiro.');return}const z=n=>String(n).padStart(2,'0'),[hh,mm]=S.cfg.hora.split(':'),st=new Date().toISOString().replace(/[-:]|\.\d+/g,'');
+ const RR={Mensalmente:'MONTHLY',Semanalmente:'WEEKLY',Diariamente:'DAILY',Anualmente:'YEARLY'};
+ const ev=list.map(c=>['BEGIN:VEVENT','UID:gestor-'+c.id+'@local','DTSTAMP:'+st,'DTSTART:'+c.venc.replace(/-/g,'')+'T'+z(hh)+z(mm)+'00','DURATION:PT15M','SUMMARY:💜 Cobrar '+c.nome+' ('+R(c.valor)+')',RR[c.rep]?'RRULE:FREQ='+RR[c.rep]:'','BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Cobrar '+c.nome,'TRIGGER:PT0M','END:VALARM','END:VEVENT'].filter(Boolean).join('\r\n'));
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Gestor//PT\r\n'+ev.join('\r\n')+'\r\nEND:VCALENDAR'],{type:'text/calendar'}));a.download='cobrancas.ics';a.click()}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+setInterval(avisar,6e4);document.addEventListener('visibilitychange',()=>avisar());
+render();sync();avisar();
+</script>
+</body>
+</html>
